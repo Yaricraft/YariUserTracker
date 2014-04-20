@@ -1,0 +1,9 @@
+name: YariUserTracker
+main: com.yaricraft.YariUserTracker.YariUserTracker
+version: 0.0.1
+commands:
+   yut:
+      description: This is a demo command.
+      usage: /<command>
+      permission: <plugin name>.yut
+      permission-message: You don't have <permission>
