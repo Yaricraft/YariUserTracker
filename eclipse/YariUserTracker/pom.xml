@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.yaricraft</groupId>
   <artifactId>YariUserTracker</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
+  <version>0.0.2-BETA</version>
   <name>Yaricraft User Tracker</name>
   <description>Tools for tracking the reputation of users on a Minecraft server.</description>
   <build>
