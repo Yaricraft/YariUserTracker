@@ -1,10 +1,12 @@
 package com.yaricraft.YariUserTracker;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
+import java.util.logging.Level;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -14,6 +16,9 @@ import java.io.OutputStream;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -37,7 +42,7 @@ import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.DriveScopes;
 //import com.google.api.services.drive.model.File;
 
-public final class YariUserTracker extends JavaPlugin {
+public final class YariUserTracker extends JavaPlugin implements Listener {
 	
 	public Map<String, Integer> playerPoints = new HashMap<String, Integer>();
 	
@@ -162,8 +167,25 @@ public final class YariUserTracker extends JavaPlugin {
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
     	
-    	// See how the command was received. (Console or Player)
-    	Player player = (Player) sender;
+    	// Check if command was sent by console.
+    	Player player;
+		if (!(sender instanceof Player)) {
+			sender.sendMessage("This command can only be run by a player.");
+			return true;
+		} else {
+			player = (Player) sender;
+		}
+		
+		// Copy the args
+		List<String> lcargs = new ArrayList<String>();
+		for(String s : args) { lcargs.add(s); }
+		if(lcargs.contains("add") || lcargs.contains("remove") || lcargs.contains("punish") || lcargs.contains("load") || lcargs.contains("save"))
+		{
+			if(!player.hasPermission("usertracker.admin"))
+			{
+				player.sendMessage("Error: You don't have the required permission \"usertracker.admin\".");
+			}
+		}
     	
     	// Read the command. Arguments can be in any order.
     	eCommand opCommand = eCommand.NONE;
@@ -238,7 +260,7 @@ public final class YariUserTracker extends JavaPlugin {
     			continue;
     		}catch(Exception e)
     		{
-    			opPlayers.add(args[i]);
+    			opPlayers.add(args[i].toLowerCase());
     			continue;
     		}
     	}
@@ -252,8 +274,13 @@ public final class YariUserTracker extends JavaPlugin {
     		}else{
     			if(strDiskCommand.equals(""))
     			{
-    				player.sendMessage("TODO: Add help.");
-    				return true;
+    				try
+    				{
+    					player.sendMessage("You have "+playerPoints.get(player.getName().toLowerCase())+" reputation points.");
+    					return true;
+    				} catch(Exception e) {
+    					player.sendMessage("You were not found in the usertracker. :(");
+    				}
     			}
     		}
     	}
@@ -323,7 +350,7 @@ public final class YariUserTracker extends JavaPlugin {
 		    			break;
 		    		case NONE:
 		    			playerPoints.put(playername, 10+opNumber);
-    	    			player.sendMessage(playername+" created with "+String.valueOf(10)+" points");
+    	    			player.sendMessage(playername+" created with "+String.valueOf(config.get("repstart"))+" points");
 		    	    	break;
 		    	    default:
 		    	    	break;
@@ -341,5 +368,15 @@ public final class YariUserTracker extends JavaPlugin {
 
     	// If the command worked return true.
     	return true;
+    }
+    
+    @EventHandler
+    public void onLogin(PlayerLoginEvent event) {
+        String player = event.getPlayer().getName().toLowerCase();
+        if(!playerPoints.containsKey(player))
+        {
+        	event.getPlayer().sendMessage("You were added to the usertracker with the default "+String.valueOf(config.get("repstart"))+" points.");
+        	playerPoints.put(player, Integer.parseInt(config.getString("repstart")));
+        }
     }
 }

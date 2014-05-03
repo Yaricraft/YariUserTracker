@@ -5,5 +5,9 @@ commands:
    yut:
       description: This is a demo command.
       usage: /<command>
-      permission: <plugin name>.yut
-      permission-message: You don't have <permission>
+      permission: usertracker.yut
+      permission-message: You don't have permission to use YariUserTracker.
+permissions:
+   usertracker.yut:
+      description: Gives access to all YariUserTracker commands.
+      default: true
