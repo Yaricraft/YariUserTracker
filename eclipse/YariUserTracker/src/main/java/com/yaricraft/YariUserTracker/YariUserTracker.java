@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
@@ -15,6 +17,7 @@ import java.io.OutputStream;
 
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.defaults.OpCommand;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -44,7 +47,9 @@ import com.google.api.services.drive.DriveScopes;
 
 public final class YariUserTracker extends JavaPlugin implements Listener {
 	
-	public Map<String, Integer> playerPoints = new HashMap<String, Integer>();
+	public Map<String, Integer> mapPlayers = new LinkedHashMap<String, Integer>();
+	private Map<String, Integer> mapCommands = new HashMap<String, Integer>();
+	private List<String> lstrOPCommands = new ArrayList<String>();
 	
 	File actionsFile;
     File configFile;
@@ -56,10 +61,19 @@ public final class YariUserTracker extends JavaPlugin implements Listener {
     FileConfiguration users;
     FileConfiguration history;
     
-	
-	private enum eCommand {
-		NONE, ADD, REMOVE, PUNISH
-	}
+    // Command Constants
+    private static final int ADD = 1;
+    private static final int REMOVE = 2;
+    private static final int PUNISH = 3;
+    private static final int PRAISE = 4;
+    private static final int SAVE = 10;
+    private static final int LOAD = 11;
+    private static final int SETMAX = 15;
+    private static final int SETSTART = 16;
+    private static final int LIST = 100;
+    private static final int HISTORY = 101;
+    private static final int MAX = 105;
+    private static final int START = 106;
 	
     @Override
     public void onEnable() {
@@ -108,6 +122,20 @@ public final class YariUserTracker extends JavaPlugin implements Listener {
             historyFile.getParentFile().mkdirs();
             copy(getResource("history.yml"), historyFile);
         }
+        
+        mapCommands.put("add", ADD);
+        mapCommands.put("remove", REMOVE);
+        mapCommands.put("punish", 3);
+        mapCommands.put("praise", 4);
+        mapCommands.put("reward", 4);
+        mapCommands.put("save", 10);
+        mapCommands.put("load", 11);
+        mapCommands.put("setmax", 15);
+        mapCommands.put("setstart", 16);
+        mapCommands.put("list", LIST);
+        mapCommands.put("history", 101);
+        mapCommands.put("max", 105);
+        mapCommands.put("start", 106);
     }
     
     private void copy(InputStream in, File file) {
@@ -137,20 +165,20 @@ public final class YariUserTracker extends JavaPlugin implements Listener {
         
         for(String i : users.getKeys(false))
         {
-        	if(playerPoints.containsKey(i))
+        	if(mapPlayers.containsKey(i))
         	{
-        		getLogger().info("Player "+i+" was already loaded, ignoring...");
+        		// getLogger().info("Player "+i+" was already loaded, ignoring...");
         	}else{
-        		playerPoints.put(i, users.getInt(i));
+        		mapPlayers.put(i, users.getInt(i));
         	}
         }
     }
     
     public void saveYamls() {
     	
-    	for(String i : playerPoints.keySet())
+    	for(String i : mapPlayers.keySet())
     	{
-    		users.set(i, playerPoints.get(i));
+    		users.set(i, mapPlayers.get(i));
     	}
     	
         try {
@@ -176,207 +204,192 @@ public final class YariUserTracker extends JavaPlugin implements Listener {
 			player = (Player) sender;
 		}
 		
+		// Check permissions
+		boolean isAdmin = player.hasPermission("usertracker.admin");
+		
 		// Copy the args
 		List<String> lcargs = new ArrayList<String>();
-		for(String s : args) { lcargs.add(s); }
-		if(lcargs.contains("add") || lcargs.contains("remove") || lcargs.contains("punish") || lcargs.contains("load") || lcargs.contains("save"))
-		{
-			if(!player.hasPermission("usertracker.admin"))
-			{
-				player.sendMessage("Error: You don't have the required permission \"usertracker.admin\".");
-			}
-		}
-    	
+		for(String s : args) { lcargs.add(s.toLowerCase()); }
+		
     	// Read the command. Arguments can be in any order.
-    	eCommand opCommand = eCommand.NONE;
-    	int opNumber = 0;
-    	List<String> opPlayers = new ArrayList<String>();
-    	String strDiskCommand = "";
+    	int intCommandNumber = 0;
+    	List<String> lstrCommandPlayers = new ArrayList<String>();
+    	String strCommand = "";
     	
-    	for(int i = 0; i < args.length; i++)
+    	for(int i = 0; i < lcargs.size(); i++)
     	{
-    		if(args[i].equalsIgnoreCase("add"))
+    		String arg = lcargs.get(i);
+    		if(mapCommands.containsKey(arg))
     		{
-    			if(opCommand != eCommand.NONE)
+    			if(strCommand.equals(""))
     			{
-    				player.sendMessage("Warning: Ignoring additional command ADD");
-    				continue;
-    			}
-    			opCommand = eCommand.ADD;
-    			continue;
-    		}
-    		if(args[i].equalsIgnoreCase("remove"))
-    		{
-    			if(opCommand != eCommand.NONE)
-    			{
-    				player.sendMessage("Warning: Ignoring additional command REMOVE");
-    				continue;
-    			}
-    			opCommand = eCommand.REMOVE;
-    			continue;
-    		}
-    		if(args[i].equalsIgnoreCase("punish"))
-    		{
-    			if(opCommand != eCommand.NONE)
-    			{
-    				player.sendMessage("Warning: Ignoring additional command PUNISH");
-    				continue;
-    			}
-    			opCommand = eCommand.PUNISH;
-    			
-    			player.sendMessage("Error: No valid punishment found.");
-    			return false;
-    		}
-    		if(args[i].equalsIgnoreCase("save"))
-    		{
-    			if(strDiskCommand.equals(""))
-    			{
-    				strDiskCommand = "save";
-    				continue;
+    				strCommand = arg;
     			}else{
-    				player.sendMessage("Error: Can't use multiple disk commands.");
-        			return true;
-    			}
-    		}
-    		if(args[i].equalsIgnoreCase("load"))
-    		{
-    			if(strDiskCommand.equals(""))
-    			{
-    				strDiskCommand = "load";
-    				continue;
-    			}else{
-    				player.sendMessage("Error: Can't use multiple disk commands.");
-        			return true;
-    			}
-    		}
-    		try
-    		{
-    			opNumber = Integer.parseInt(args[i]);
-    			if(opNumber <= 0)
-        		{
-			    	player.sendMessage("Error: Number needs to be larger than 0.");
+    				player.sendMessage("Error: Cannot use more than one command. (Used "+strCommand+" and "+arg+")");
     				return true;
-        		}
-    			continue;
-    		}catch(Exception e)
-    		{
-    			opPlayers.add(args[i].toLowerCase());
-    			continue;
-    		}
-    	}
-    	
-    	if(opPlayers.size() == 0)
-    	{
-    		if(opCommand != eCommand.NONE)
-    		{
-	    		player.sendMessage("Error: No players were found for command "+opCommand.toString());
-	    		return true;
-    		}else{
-    			if(strDiskCommand.equals(""))
-    			{
-    				try
-    				{
-    					player.sendMessage("You have "+playerPoints.get(player.getName().toLowerCase())+" reputation points.");
-    					return true;
-    				} catch(Exception e) {
-    					player.sendMessage("You were not found in the usertracker. :(");
-    				}
     			}
+    			if(mapCommands.get(strCommand)<100 && !isAdmin)
+    			{
+					player.sendMessage("Error: You don't have the required permission \"usertracker.admin\" for command \""+strCommand+"\".");
+					return true;
+    			}
+    		}else{
+	    		try
+	    		{
+	    			int intCommandInput = Integer.parseInt(arg);
+	    			if(intCommandNumber == 0)
+	    			{
+	    				intCommandNumber = intCommandInput;
+	    			}else{
+	    				player.sendMessage("Error: Can't use more than one number.");
+	    				return true;
+	    			}
+	    			if(intCommandNumber <= 0)
+	        		{
+				    	player.sendMessage("Error: Number needs to be larger than 0.");
+	    				return true;
+	        		}
+	    			continue;
+	    		}catch(Exception e){
+	    			if(!mapPlayers.containsKey(arg))
+	    			{
+	    				if(isAdmin)
+	    				{
+	    					try
+	    					{
+	    						mapPlayers.put(arg, Integer.parseInt(config.getString("repstart")));
+	    					}catch(Exception e2){
+	    						player.sendMessage("Error: Malformed config.yml");
+	    						return true;
+	    					}
+	    					player.sendMessage("Created player "+arg+" with "+config.getString("repstart")+" Reputation Points");
+	    					lstrCommandPlayers.add(arg);
+	    					continue;
+	    				}else{
+	    					player.sendMessage("Warning: Could not find player "+arg+", ignoring.");
+	    					continue;
+	    				}
+	    			}else{
+	    				lstrCommandPlayers.add(arg);
+	    				continue;
+	    			}
+	    		}
     		}
-    	}
-    	
-    	if(opNumber != 0 && opCommand == eCommand.NONE)
-    	{
-    		player.sendMessage("Error: Numbers found but no command was used.");
-    		return true;
-    	}
-    	
-    	if(opNumber == 0 && (opCommand == eCommand.ADD || opCommand == eCommand.REMOVE))
-    	{
-    		player.sendMessage("Error: Number required for command "+opCommand.toString());
-    		return true;
-    	}
-    	
-    	// Done reading command, now process.
-    	
-    	// Load
-    	if(strDiskCommand.equals("load"))
-    	{
-    		loadYamls();
-    		player.sendMessage("YariUserTracker loaded from disk.");
-    	}
-    	
-    	// Change rep.
-    	String playername;
-    	int playerpoints;
-    	for(int i = 0; i < opPlayers.size(); i++)
-    	{
-    		playername = opPlayers.get(i);
-    		if(playername.equals("save") || playername.equals("load") )
-    		{
-    			
-    		}
-    		if(playerPoints.containsKey(playername))
-    		{
-    			playerpoints = playerPoints.get(playername);
-		    	switch (opCommand) {
-		    		case ADD:
-		    			playerPoints.put(playername, playerpoints+opNumber);
-    	    			player.sendMessage(playername+" points increased from "+String.valueOf(playerpoints)+" to "+String.valueOf(playerpoints+opNumber));
-		    			break;
-		    		case REMOVE:
-		    			playerPoints.put(playername, playerpoints-opNumber);
-    	    			player.sendMessage(playername+" points decreased from "+String.valueOf(playerpoints)+" to "+String.valueOf(playerpoints-opNumber));
-		    			break;
-		    		case PUNISH:
-		    			break;
-		    		case NONE:
-		    			player.sendMessage(playername+" has "+String.valueOf(playerpoints)+" points.");
-		    	    	break;
-		    	    default:
-		    	    	break;
-		    	}
-	    	}else{
-	    		switch (opCommand) {
-		    		case ADD:
-		    			playerPoints.put(playername, 10+opNumber);
-    	    			player.sendMessage(playername+" created with "+String.valueOf(10+opNumber)+" points");
-		    			break;
-		    		case REMOVE:
-		    			playerPoints.put(playername, 10-opNumber);
-    	    			player.sendMessage(playername+" created with "+String.valueOf(10-opNumber)+" points");
-		    			break;
-		    		case PUNISH:
-		    			break;
-		    		case NONE:
-		    			playerPoints.put(playername, 10+opNumber);
-    	    			player.sendMessage(playername+" created with "+String.valueOf(config.get("repstart"))+" points");
-		    	    	break;
-		    	    default:
-		    	    	break;
-		    	}
-				continue;
-	    	}
-    	}
-    	
-    	// Save
-    	if(strDiskCommand.equals("save"))
-    	{
-    		saveYamls();
-    		player.sendMessage("YariUserTracker saved to disk.");
     	}
 
-    	// If the command worked return true.
+    	// Process the command
+    	try
+    	{
+			switch(mapCommands.get(strCommand))
+			{
+				case ADD:
+					if(intCommandNumber==0)
+					{
+						player.sendMessage("Error: No number.");
+						return true;
+					}
+					for(String strCommandPlayer : lstrCommandPlayers)
+					{
+						int old = mapPlayers.get(strCommandPlayer);
+						mapPlayers.put(strCommandPlayer, old+intCommandNumber);
+					}
+					player.sendMessage("Added "+intCommandNumber+" Reputation Points to "+Integer.toString(lstrCommandPlayers.size())+" users.");
+	    	    	break;
+				case REMOVE:
+					if(intCommandNumber==0)
+					{
+						player.sendMessage("Error: No number.");
+						return true;
+					}
+					for(String strCommandPlayer : lstrCommandPlayers)
+					{
+						int old = mapPlayers.get(strCommandPlayer);
+						mapPlayers.put(strCommandPlayer, old-intCommandNumber);
+					}
+					player.sendMessage("Removed "+intCommandNumber+" Reputation Points from "+Integer.toString(lstrCommandPlayers.size())+" users.");
+	    	    	break;
+				case PUNISH:
+	    			break;
+				case PRAISE:
+	    	    	break;
+				case SAVE:
+					saveYamls();
+		    		player.sendMessage("YariUserTracker saved to disk.");
+	    	    	break;
+				case LOAD:
+					loadYamls();
+		    		player.sendMessage("YariUserTracker loaded from disk.");
+	    	    	break;
+				case SETMAX:
+	    	    	break;
+				case SETSTART:
+	    	    	break;
+				case LIST:
+					if(intCommandNumber==0)
+					{
+						player.sendMessage("Error: No number.");
+						return true;
+					}
+					int pages = mapPlayers.size()/5+1;
+					if(intCommandNumber>pages)
+					{
+						player.sendMessage("Error: Page not found.");
+						return true;
+					}
+					player.sendMessage("Page "+Integer.toString(intCommandNumber)+"/"+Integer.toString(pages));
+					for (Map.Entry<String, Integer> entry : mapPlayers.entrySet()) {
+					    String key = entry.getKey();
+					    Integer value = entry.getValue();
+					    player.sendMessage(key+" has "+value+" Reputation Points.");
+					}
+	    	    	break;
+				case HISTORY:
+	    	    	break;
+				case MAX:
+					player.sendMessage("Maximum Reputation Points is "+config.getString("repmax")+".");
+	    	    	break;
+				case START:
+					player.sendMessage("Starting Reputation Points is "+config.getString("repstart")+".");
+	    	    	break;
+	    	    default:
+	    	    	break;
+			}
+    	}catch(Exception e){
+    		if(!strCommand.equals(""))
+    		{
+    			player.sendMessage("Error: Malformed command "+strCommand+".");
+    			return true;
+    		}
+    		if(lstrCommandPlayers.isEmpty())
+    		{
+	    		try
+	    		{
+	    			player.sendMessage("You have "+mapPlayers.get(player.getName().toLowerCase())+" reputation points.");
+				} catch(Exception e2) {
+					player.sendMessage("You were not found in the usertracker. :(");
+				}
+    		}else{
+    			for(String strCommandPlayer : lstrCommandPlayers)
+				{
+					player.sendMessage(strCommandPlayer+" has "+Integer.toString(mapPlayers.get(strCommandPlayer))+" Reputation Points.");
+				}
+    		}
+    	}
     	return true;
+    }
+    
+    private void ChangeRep(List<String> lstrCommandPlayers, int intCommandNumber)
+    {
+    	
     }
     
     @EventHandler
     public void onLogin(PlayerLoginEvent event) {
         String player = event.getPlayer().getName().toLowerCase();
-        if(!playerPoints.containsKey(player))
+        if(!mapPlayers.containsKey(player))
         {
         	event.getPlayer().sendMessage("You were added to the usertracker with the default "+String.valueOf(config.get("repstart"))+" points.");
-        	playerPoints.put(player, Integer.parseInt(config.getString("repstart")));
+        	mapPlayers.put(player, Integer.parseInt(config.getString("repstart")));
         }
     }
 }
