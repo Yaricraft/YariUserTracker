@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -26,6 +27,7 @@ public final class CommandHandler {
 		
 		// Check permissions
 		boolean isAdmin = player.hasPermission("usertracker.admin");
+		boolean isOp = player.isOp();
 		
     	// Read the command. Arguments can be in any order.
     	int intCommandNumber = 0;
@@ -44,7 +46,7 @@ public final class CommandHandler {
     				player.sendMessage("Error: Cannot use more than one command. (Used "+strCommand+" and "+arg+")");
     				return;
     			}
-    			if(YariUserTracker.mapCommands.get(strCommand)<100 && !isAdmin)
+    			if(YariUserTracker.mapCommands.get(strCommand)<100 && !(isAdmin || isOp))
     			{
 					player.sendMessage("Error: You don't have the required permission \"usertracker.admin\" for command \""+strCommand+"\".");
 					return;
@@ -136,30 +138,50 @@ public final class CommandHandler {
 					YariUserTracker.loadYamls();
 		    		player.sendMessage("YariUserTracker loaded from disk.");
 	    	    	break;
+				case YariUserTracker.PURGE:
+					for(String strCommandPlayer : lstrCommandPlayers)
+					{
+						YariUserTracker.mapPlayers.remove(strCommandPlayer);
+						player.sendMessage("Purged player "+strCommandPlayer+" from the tracker.");
+					}
+	    	    	break;
 				case YariUserTracker.SETMAX:
+					YariUserTracker.setConfig("config", "repmax", Integer.toString(intCommandNumber));
+					player.sendMessage("Set Reputation maximum to "+Integer.toString(intCommandNumber)+".");
 	    	    	break;
 				case YariUserTracker.SETSTART:
+					YariUserTracker.setConfig("config", "repstart", Integer.toString(intCommandNumber));
+					player.sendMessage("Set Reputation start to "+Integer.toString(intCommandNumber)+".");
+	    	    	break;
+				case YariUserTracker.HELP:
+					player.sendMessage(ChatColor.GOLD+"=============================");
+					player.sendMessage(ChatColor.GOLD+"       YariUserTracker");
+					player.sendMessage(ChatColor.GOLD+"=============================");
+					player.sendMessage(ChatColor.AQUA+"Arguments can be in any order. Multiple players can be used in any command with <player>.");
+					player.sendMessage(ChatColor.GOLD+"/yut: "+ChatColor.WHITE+"Shows you your reputation points.");
+					player.sendMessage(ChatColor.GOLD+"/yut list: "+ChatColor.WHITE+"Shows the reputation points of all users.");
+					player.sendMessage(ChatColor.GOLD+"/yut <player>: "+ChatColor.WHITE+"Shows you the reputation points of player.");
+					player.sendMessage(ChatColor.GOLD+"/yut max: "+ChatColor.WHITE+"Shows you the maximum reputation points.");
+					player.sendMessage(ChatColor.GOLD+"/yut start: "+ChatColor.WHITE+"Shows you the starting reputation points for new players.");
+					if(isAdmin || isOp)
+					{
+						player.sendMessage(ChatColor.RED+"ADMIN COMMANDS:");
+						player.sendMessage(ChatColor.GOLD+"/yut add <number> <player>: "+ChatColor.WHITE+"Adds <number> reputation points to <player>.");
+						player.sendMessage(ChatColor.GOLD+"/yut remove <number> <player>: "+ChatColor.WHITE+"Removes <number> reputation points from <player>.");
+						player.sendMessage(ChatColor.GOLD+"/yut save: "+ChatColor.WHITE+"Saves all data to disk.");
+						player.sendMessage(ChatColor.GOLD+"/yut load: "+ChatColor.WHITE+"Loads any data added to disk after the server started.");
+						player.sendMessage(ChatColor.GOLD+"/yut setmax <number>: "+ChatColor.WHITE+"Set the maximum reputation points.");
+						player.sendMessage(ChatColor.GOLD+"/yut setstart <number>: "+ChatColor.WHITE+"Set the starting reputation points for new players.");
+					}
+	    	    	break;
+				case YariUserTracker.HISTORY:
 	    	    	break;
 				case YariUserTracker.LIST:
-					if(intCommandNumber==0)
-					{
-						player.sendMessage("Error: No number.");
-						return;
-					}
-					int pages = YariUserTracker.mapPlayers.size()/5+1;
-					if(intCommandNumber>pages)
-					{
-						player.sendMessage("Error: Page not found.");
-						return;
-					}
-					player.sendMessage("Page "+Integer.toString(intCommandNumber)+"/"+Integer.toString(pages));
 					for (Map.Entry<String, Integer> entry : YariUserTracker.mapPlayers.entrySet()) {
 					    String key = entry.getKey();
 					    Integer value = entry.getValue();
 					    player.sendMessage(key+" has "+value+" Reputation Points.");
 					}
-	    	    	break;
-				case YariUserTracker.HISTORY:
 	    	    	break;
 				case YariUserTracker.MAX:
 					player.sendMessage("Maximum Reputation Points is "+YariUserTracker.getConfig("config","repmax")+".");
@@ -192,10 +214,5 @@ public final class CommandHandler {
     		}
     	}
     	return;
-    }
-    
-    private void ChangeRep(List<String> lstrCommandPlayers, int intCommandNumber)
-    {
-    	
     }
 }

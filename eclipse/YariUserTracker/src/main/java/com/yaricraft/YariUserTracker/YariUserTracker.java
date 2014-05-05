@@ -1,8 +1,6 @@
 package com.yaricraft.YariUserTracker;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.io.File;
@@ -25,12 +23,7 @@ public final class YariUserTracker extends JavaPlugin {
 	public static TreeMap<String, Integer> mapPlayers = new TreeMap<String, Integer>(new AlphaComparator());
 	public static Map<String, Integer> mapCommands = new HashMap<String, Integer>();
 	public static Map<String, FileConfiguration> mapConfigs = new HashMap<String, FileConfiguration>();
-	
-	// Files
-	private static File actionsFile;
-	private static File configFile;
-	private static File usersFile;
-	private static File historyFile;
+	private static Map<String, File> mapFiles = new HashMap<String, File>();
     
     // Command Constants
 	public static final int ADD = 1;
@@ -39,10 +32,12 @@ public final class YariUserTracker extends JavaPlugin {
 	public static final int PRAISE = 4;
 	public static final int SAVE = 10;
 	public static final int LOAD = 11;
+	public static final int PURGE = 12;
 	public static final int SETMAX = 15;
 	public static final int SETSTART = 16;
-	public static final int LIST = 100;
+	public static final int HELP = 100;
 	public static final int HISTORY = 101;
+	public static final int LIST = 103;
 	public static final int MAX = 105;
 	public static final int START = 106;
     
@@ -61,11 +56,10 @@ public final class YariUserTracker extends JavaPlugin {
 	
     @Override
     public void onEnable() {
-    	getLogger().info("Loading configs...");
-        configFile = new File(getDataFolder(), "config.yml");
-        usersFile = new File(getDataFolder(), "users.yml");
-        actionsFile = new File(getDataFolder(), "actions.yml");
-        historyFile = new File(getDataFolder(), "history.yml");
+        mapFiles.put("config", new File(getDataFolder(), "config.yml"));
+        mapFiles.put("users", new File(getDataFolder(), "users.yml"));
+		mapFiles.put("actions", new File(getDataFolder(), "actions.yml"));
+		mapFiles.put("history", new File(getDataFolder(), "history.yml"));
         
         try {
             firstRun();
@@ -81,8 +75,6 @@ public final class YariUserTracker extends JavaPlugin {
         loadYamls();
         
         getServer().getPluginManager().registerEvents(new Listeners(), this);
-        
-        getLogger().info("Points max: "+mapConfigs.get("config").getString("repmax"));
     }
     
     @Override
@@ -98,21 +90,21 @@ public final class YariUserTracker extends JavaPlugin {
     }
     
     private void firstRun() throws Exception {
-        if(!configFile.exists()){                        // checks if the yaml does not exists
-            configFile.getParentFile().mkdirs();         // creates the /plugins/<pluginName>/ directory if not found
-            copy(getResource("config.yml"), configFile); // copies the yaml from your jar to the folder /plugin/<pluginName>
+        if(!mapFiles.get("config").exists()){                        // checks if the yaml does not exists
+        	mapFiles.get("config").getParentFile().mkdirs();         // creates the /plugins/<pluginName>/ directory if not found
+            copy(getResource("config.yml"), mapFiles.get("config")); // copies the yaml from your jar to the folder /plugin/<pluginName>
         }
-        if(!actionsFile.exists()){
-            actionsFile.getParentFile().mkdirs();
-            copy(getResource("groups.yml"), actionsFile);
+        if(!mapFiles.get("actions").exists()){
+        	mapFiles.get("actions").getParentFile().mkdirs();
+            copy(getResource("groups.yml"), mapFiles.get("actions"));
         }
-        if(!usersFile.exists()){
-            usersFile.getParentFile().mkdirs();
-            copy(getResource("users.yml"), usersFile);
+        if(!mapFiles.get("users").exists()){
+        	mapFiles.get("users").getParentFile().mkdirs();
+            copy(getResource("users.yml"), mapFiles.get("users"));
         }
-        if(!historyFile.exists()){
-            historyFile.getParentFile().mkdirs();
-            copy(getResource("history.yml"), historyFile);
+        if(!mapFiles.get("history").exists()){
+        	mapFiles.get("history").getParentFile().mkdirs();
+            copy(getResource("history.yml"), mapFiles.get("history"));
         }
         
         mapCommands.put("add", ADD);
@@ -122,10 +114,13 @@ public final class YariUserTracker extends JavaPlugin {
         mapCommands.put("reward", PRAISE); // Alias
         mapCommands.put("save", SAVE);
         mapCommands.put("load", LOAD);
+        mapCommands.put("purge", PURGE);
+        mapCommands.put("delete", PURGE); // Alias
         mapCommands.put("setmax", SETMAX);
         mapCommands.put("setstart", SETSTART);
-        mapCommands.put("list", LIST);
+        mapCommands.put("help", HELP);
         mapCommands.put("history", HISTORY);
+        mapCommands.put("list", LIST);
         mapCommands.put("max", MAX);
         mapCommands.put("start", START);
     }
@@ -147,11 +142,13 @@ public final class YariUserTracker extends JavaPlugin {
     
     public static void loadYamls() {
         try {
+        	
         	// Load the contents of the File to its FileConfiguration
-            mapConfigs.get("config").load(configFile); 
-            mapConfigs.get("actions").load(actionsFile);
-    		mapConfigs.get("users").load(usersFile);
-			mapConfigs.get("history").load(historyFile);
+        	for(String s : mapConfigs.keySet() )
+        	{
+        		mapConfigs.get(s).load(mapFiles.get(s));
+        	}
+        	
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -170,17 +167,22 @@ public final class YariUserTracker extends JavaPlugin {
     
     public static void saveYamls() {
     	
+    	// Clear the users.
+    	mapConfigs.put("users", new YamlConfiguration());
+    	
+    	// Add the users.
     	for(String i : mapPlayers.keySet())
     	{
     		mapConfigs.get("users").set(i, mapPlayers.get(i));
     	}
     	
+    	// Save the yamls.
         try {
         	// Save the FileConfiguration to its File
-        	mapConfigs.get("config").save(configFile);
-			mapConfigs.get("actions").save(actionsFile);
-			mapConfigs.get("users").save(usersFile);
-			mapConfigs.get("history").save(historyFile);
+        	for(String s : mapConfigs.keySet() )
+        	{
+        		mapConfigs.get(s).save(mapFiles.get(s));
+        	}
         } catch (IOException e) {
             e.printStackTrace();
         }
