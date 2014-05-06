@@ -1,6 +1,6 @@
 name: YariUserTracker
 main: com.yaricraft.YariUserTracker.YariUserTracker
-version: 0.0.2
+version: 0.0.3
 commands:
    yut:
       description: Command for YariUserTracker.
