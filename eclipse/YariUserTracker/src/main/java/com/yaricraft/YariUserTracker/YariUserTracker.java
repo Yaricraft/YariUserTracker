@@ -1,5 +1,6 @@
 package com.yaricraft.YariUserTracker;
 
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
@@ -9,6 +10,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import org.bukkit.ChatColor;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -21,25 +23,8 @@ public final class YariUserTracker extends JavaPlugin {
 	
 	// Maps
 	public static TreeMap<String, Integer> mapPlayers = new TreeMap<String, Integer>(new AlphaComparator());
-	public static Map<String, Integer> mapCommands = new HashMap<String, Integer>();
 	public static Map<String, FileConfiguration> mapConfigs = new HashMap<String, FileConfiguration>();
 	private static Map<String, File> mapFiles = new HashMap<String, File>();
-    
-    // Command Constants
-	public static final int ADD = 1;
-	public static final int REMOVE = 2;
-	public static final int PUNISH = 3;
-	public static final int PRAISE = 4;
-	public static final int SAVE = 10;
-	public static final int LOAD = 11;
-	public static final int PURGE = 12;
-	public static final int SETMAX = 15;
-	public static final int SETSTART = 16;
-	public static final int HELP = 100;
-	public static final int HISTORY = 101;
-	public static final int LIST = 103;
-	public static final int MAX = 105;
-	public static final int START = 106;
     
     // Getters and setters
     
@@ -56,6 +41,7 @@ public final class YariUserTracker extends JavaPlugin {
 	
     @Override
     public void onEnable() {
+    	
         mapFiles.put("config", new File(getDataFolder(), "config.yml"));
         mapFiles.put("users", new File(getDataFolder(), "users.yml"));
 		mapFiles.put("actions", new File(getDataFolder(), "actions.yml"));
@@ -106,23 +92,6 @@ public final class YariUserTracker extends JavaPlugin {
         	mapFiles.get("history").getParentFile().mkdirs();
             copy(getResource("history.yml"), mapFiles.get("history"));
         }
-        
-        mapCommands.put("add", ADD);
-        mapCommands.put("remove", REMOVE);
-        mapCommands.put("punish", PUNISH);
-        mapCommands.put("praise", PRAISE);
-        mapCommands.put("reward", PRAISE); // Alias
-        mapCommands.put("save", SAVE);
-        mapCommands.put("load", LOAD);
-        mapCommands.put("purge", PURGE);
-        mapCommands.put("delete", PURGE); // Alias
-        mapCommands.put("setmax", SETMAX);
-        mapCommands.put("setstart", SETSTART);
-        mapCommands.put("help", HELP);
-        mapCommands.put("history", HISTORY);
-        mapCommands.put("list", LIST);
-        mapCommands.put("max", MAX);
-        mapCommands.put("start", START);
     }
     
     private void copy(InputStream in, File file) {
