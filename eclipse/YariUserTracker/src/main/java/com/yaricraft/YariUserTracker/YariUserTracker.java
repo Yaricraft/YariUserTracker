@@ -1,68 +1,51 @@
 package com.yaricraft.YariUserTracker;
 
-import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-
+import java.util.TreeMap;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import org.bukkit.ChatColor;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
-import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
-import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
-import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
-import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
-import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
-import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
-import com.google.api.client.googleapis.media.MediaHttpDownloader;
-import com.google.api.client.googleapis.media.MediaHttpUploader;
-import com.google.api.client.http.FileContent;
-import com.google.api.client.http.GenericUrl;
-import com.google.api.client.http.HttpTransport;
-import com.google.api.client.json.JsonFactory;
-import com.google.api.client.util.Preconditions;
-import com.google.api.client.util.store.DataStoreFactory;
-import com.google.api.client.util.store.FileDataStoreFactory;
-import com.google.api.services.drive.Drive;
-import com.google.api.services.drive.DriveScopes;
-//import com.google.api.services.drive.model.File;
-
 public final class YariUserTracker extends JavaPlugin {
 	
-	public Map<String, Integer> playerPoints = new HashMap<String, Integer>();
+	// Private variables
 	
-	File actionsFile;
-    File configFile;
-    File usersFile;
-    File historyFile;
-
-    FileConfiguration actions;
-    FileConfiguration config;
-    FileConfiguration users;
-    FileConfiguration history;
+	// Maps
+	public static TreeMap<String, Integer> mapPlayers = new TreeMap<String, Integer>(new AlphaComparator());
+	public static Map<String, FileConfiguration> mapConfigs = new HashMap<String, FileConfiguration>();
+	private static Map<String, File> mapFiles = new HashMap<String, File>();
     
-	
-	private enum eCommand {
-		NONE, ADD, REMOVE, PUNISH
-	}
+    // Getters and setters
+    
+    public static String getConfig(String _strConfig, String _strKey )
+    {
+    	String value = mapConfigs.get(_strConfig).getString(_strKey);
+    	return value;
+    }
+    
+    public static void setConfig(String _strConfig, String _strKey, String _strValue )
+    {
+    	mapConfigs.get(_strConfig).set(_strKey, _strValue);
+    }
 	
     @Override
     public void onEnable() {
-    	getLogger().info("Loading configs...");
-        configFile = new File(getDataFolder(), "config.yml");
-        usersFile = new File(getDataFolder(), "users.yml");
-        actionsFile = new File(getDataFolder(), "actions.yml");
-        historyFile = new File(getDataFolder(), "history.yml");
+    	
+        mapFiles.put("config", new File(getDataFolder(), "config.yml"));
+        mapFiles.put("users", new File(getDataFolder(), "users.yml"));
+		mapFiles.put("actions", new File(getDataFolder(), "actions.yml"));
+		mapFiles.put("history", new File(getDataFolder(), "history.yml"));
         
         try {
             firstRun();
@@ -70,14 +53,20 @@ public final class YariUserTracker extends JavaPlugin {
             e.printStackTrace();
         }
         
-        config = new YamlConfiguration();
-        actions = new YamlConfiguration();
-        users = new YamlConfiguration();
-        history = new YamlConfiguration();
+        mapConfigs.put("config",  new YamlConfiguration());
+        mapConfigs.put("actions",  new YamlConfiguration());
+		mapConfigs.put("users",  new YamlConfiguration());
+		mapConfigs.put("history",  new YamlConfiguration());
         
         loadYamls();
         
-        getLogger().info("Points max: "+config.getString("repmax"));
+        getServer().getPluginManager().registerEvents(new Listeners(), this);
+    }
+    
+    @Override
+    public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+    	CommandHandler.Process(sender, cmd, label, args);
+    	return true;
     }
  
     // We need to save when the server exits.
@@ -87,21 +76,21 @@ public final class YariUserTracker extends JavaPlugin {
     }
     
     private void firstRun() throws Exception {
-        if(!configFile.exists()){                        // checks if the yaml does not exists
-            configFile.getParentFile().mkdirs();         // creates the /plugins/<pluginName>/ directory if not found
-            copy(getResource("config.yml"), configFile); // copies the yaml from your jar to the folder /plugin/<pluginName>
+        if(!mapFiles.get("config").exists()){                        // checks if the yaml does not exists
+        	mapFiles.get("config").getParentFile().mkdirs();         // creates the /plugins/<pluginName>/ directory if not found
+            copy(getResource("config.yml"), mapFiles.get("config")); // copies the yaml from your jar to the folder /plugin/<pluginName>
         }
-        if(!actionsFile.exists()){
-            actionsFile.getParentFile().mkdirs();
-            copy(getResource("groups.yml"), actionsFile);
+        if(!mapFiles.get("actions").exists()){
+        	mapFiles.get("actions").getParentFile().mkdirs();
+            copy(getResource("groups.yml"), mapFiles.get("actions"));
         }
-        if(!usersFile.exists()){
-            usersFile.getParentFile().mkdirs();
-            copy(getResource("users.yml"), usersFile);
+        if(!mapFiles.get("users").exists()){
+        	mapFiles.get("users").getParentFile().mkdirs();
+            copy(getResource("users.yml"), mapFiles.get("users"));
         }
-        if(!historyFile.exists()){
-            historyFile.getParentFile().mkdirs();
-            copy(getResource("history.yml"), historyFile);
+        if(!mapFiles.get("history").exists()){
+        	mapFiles.get("history").getParentFile().mkdirs();
+            copy(getResource("history.yml"), mapFiles.get("history"));
         }
     }
     
@@ -120,226 +109,51 @@ public final class YariUserTracker extends JavaPlugin {
         }
     }
     
-    public void loadYamls() {
+    public static void loadYamls() {
         try {
-            config.load(configFile); //loads the contents of the File to its FileConfiguration
-            actions.load(actionsFile);
-            users.load(usersFile);
-            history.load(historyFile);
+        	
+        	// Load the contents of the File to its FileConfiguration
+        	for(String s : mapConfigs.keySet() )
+        	{
+        		mapConfigs.get(s).load(mapFiles.get(s));
+        	}
+        	
         } catch (Exception e) {
             e.printStackTrace();
         }
         
-        for(String i : users.getKeys(false))
+        // Store player names in our ordered map.
+        for(String i : mapConfigs.get("users").getKeys(false))
         {
-        	if(playerPoints.containsKey(i))
+        	if(mapPlayers.containsKey(i))
         	{
-        		getLogger().info("Player "+i+" was already loaded, ignoring...");
+        		// getLogger().info("Player "+i+" was already loaded, ignoring...");
         	}else{
-        		playerPoints.put(i, users.getInt(i));
+        		mapPlayers.put(i, mapConfigs.get("users").getInt(i));
         	}
         }
     }
     
-    public void saveYamls() {
+    public static void saveYamls() {
     	
-    	for(String i : playerPoints.keySet())
+    	// Clear the users.
+    	mapConfigs.put("users", new YamlConfiguration());
+    	
+    	// Add the users.
+    	for(String i : mapPlayers.keySet())
     	{
-    		users.set(i, playerPoints.get(i));
+    		mapConfigs.get("users").set(i, mapPlayers.get(i));
     	}
     	
+    	// Save the yamls.
         try {
-            config.save(configFile); //saves the FileConfiguration to its File
-            actions.save(actionsFile);
-            users.save(usersFile);
-            history.save(historyFile);
+        	// Save the FileConfiguration to its File
+        	for(String s : mapConfigs.keySet() )
+        	{
+        		mapConfigs.get(s).save(mapFiles.get(s));
+        	}
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-    
-    // The only command is /yut. We don't need to check other commands.
-    @Override
-    public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
-    	
-    	// See how the command was received. (Console or Player)
-    	Player player = (Player) sender;
-    	
-    	// Read the command. Arguments can be in any order.
-    	eCommand opCommand = eCommand.NONE;
-    	int opNumber = 0;
-    	List<String> opPlayers = new ArrayList<String>();
-    	String strDiskCommand = "";
-    	
-    	for(int i = 0; i < args.length; i++)
-    	{
-    		if(args[i].equalsIgnoreCase("add"))
-    		{
-    			if(opCommand != eCommand.NONE)
-    			{
-    				player.sendMessage("Warning: Ignoring additional command ADD");
-    				continue;
-    			}
-    			opCommand = eCommand.ADD;
-    			continue;
-    		}
-    		if(args[i].equalsIgnoreCase("remove"))
-    		{
-    			if(opCommand != eCommand.NONE)
-    			{
-    				player.sendMessage("Warning: Ignoring additional command REMOVE");
-    				continue;
-    			}
-    			opCommand = eCommand.REMOVE;
-    			continue;
-    		}
-    		if(args[i].equalsIgnoreCase("punish"))
-    		{
-    			if(opCommand != eCommand.NONE)
-    			{
-    				player.sendMessage("Warning: Ignoring additional command PUNISH");
-    				continue;
-    			}
-    			opCommand = eCommand.PUNISH;
-    			
-    			player.sendMessage("Error: No valid punishment found.");
-    			return false;
-    		}
-    		if(args[i].equalsIgnoreCase("save"))
-    		{
-    			if(strDiskCommand.equals(""))
-    			{
-    				strDiskCommand = "save";
-    				continue;
-    			}else{
-    				player.sendMessage("Error: Can't use multiple disk commands.");
-        			return true;
-    			}
-    		}
-    		if(args[i].equalsIgnoreCase("load"))
-    		{
-    			if(strDiskCommand.equals(""))
-    			{
-    				strDiskCommand = "load";
-    				continue;
-    			}else{
-    				player.sendMessage("Error: Can't use multiple disk commands.");
-        			return true;
-    			}
-    		}
-    		try
-    		{
-    			opNumber = Integer.parseInt(args[i]);
-    			if(opNumber <= 0)
-        		{
-			    	player.sendMessage("Error: Number needs to be larger than 0.");
-    				return true;
-        		}
-    			continue;
-    		}catch(Exception e)
-    		{
-    			opPlayers.add(args[i]);
-    			continue;
-    		}
-    	}
-    	
-    	if(opPlayers.size() == 0)
-    	{
-    		if(opCommand != eCommand.NONE)
-    		{
-	    		player.sendMessage("Error: No players were found for command "+opCommand.toString());
-	    		return true;
-    		}else{
-    			if(strDiskCommand.equals(""))
-    			{
-    				player.sendMessage("TODO: Add help.");
-    				return true;
-    			}
-    		}
-    	}
-    	
-    	if(opNumber != 0 && opCommand == eCommand.NONE)
-    	{
-    		player.sendMessage("Error: Numbers found but no command was used.");
-    		return true;
-    	}
-    	
-    	if(opNumber == 0 && (opCommand == eCommand.ADD || opCommand == eCommand.REMOVE))
-    	{
-    		player.sendMessage("Error: Number required for command "+opCommand.toString());
-    		return true;
-    	}
-    	
-    	// Done reading command, now process.
-    	
-    	// Load
-    	if(strDiskCommand.equals("load"))
-    	{
-    		loadYamls();
-    		player.sendMessage("YariUserTracker loaded from disk.");
-    	}
-    	
-    	// Change rep.
-    	String playername;
-    	int playerpoints;
-    	for(int i = 0; i < opPlayers.size(); i++)
-    	{
-    		playername = opPlayers.get(i);
-    		if(playername.equals("save") || playername.equals("load") )
-    		{
-    			
-    		}
-    		if(playerPoints.containsKey(playername))
-    		{
-    			playerpoints = playerPoints.get(playername);
-		    	switch (opCommand) {
-		    		case ADD:
-		    			playerPoints.put(playername, playerpoints+opNumber);
-    	    			player.sendMessage(playername+" points increased from "+String.valueOf(playerpoints)+" to "+String.valueOf(playerpoints+opNumber));
-		    			break;
-		    		case REMOVE:
-		    			playerPoints.put(playername, playerpoints-opNumber);
-    	    			player.sendMessage(playername+" points decreased from "+String.valueOf(playerpoints)+" to "+String.valueOf(playerpoints-opNumber));
-		    			break;
-		    		case PUNISH:
-		    			break;
-		    		case NONE:
-		    			player.sendMessage(playername+" has "+String.valueOf(playerpoints)+" points.");
-		    	    	break;
-		    	    default:
-		    	    	break;
-		    	}
-	    	}else{
-	    		switch (opCommand) {
-		    		case ADD:
-		    			playerPoints.put(playername, 10+opNumber);
-    	    			player.sendMessage(playername+" created with "+String.valueOf(10+opNumber)+" points");
-		    			break;
-		    		case REMOVE:
-		    			playerPoints.put(playername, 10-opNumber);
-    	    			player.sendMessage(playername+" created with "+String.valueOf(10-opNumber)+" points");
-		    			break;
-		    		case PUNISH:
-		    			break;
-		    		case NONE:
-		    			playerPoints.put(playername, 10+opNumber);
-    	    			player.sendMessage(playername+" created with "+String.valueOf(10)+" points");
-		    	    	break;
-		    	    default:
-		    	    	break;
-		    	}
-				continue;
-	    	}
-    	}
-    	
-    	// Save
-    	if(strDiskCommand.equals("save"))
-    	{
-    		saveYamls();
-    		player.sendMessage("YariUserTracker saved to disk.");
-    	}
-
-    	// If the command worked return true.
-    	return true;
     }
 }

@@ -1,9 +1,16 @@
 name: YariUserTracker
 main: com.yaricraft.YariUserTracker.YariUserTracker
-version: 0.0.1
+version: 0.0.3
 commands:
    yut:
-      description: This is a demo command.
-      usage: /<command>
-      permission: <plugin name>.yut
-      permission-message: You don't have <permission>
+      description: Command for YariUserTracker.
+      usage: use "/<command> help" for valid command arguments.
+      permission: usertracker.yut
+      permission-message: You don't have permission to use YariUserTracker.
+permissions:
+   usertracker.yut:
+      description: Gives access to YariUserTracker user commands.
+      default: true
+   usertracker.admin:
+      description: Gives access to YariUserTracker admin commands.
+      default: false
